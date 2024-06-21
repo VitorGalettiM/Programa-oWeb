@@ -50,6 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function calculateDaysAgo(date) {
+    if (!date) return "Data não disponível";
     const [dateStr, hourStr] = date.split("T");
     const [year, month, day] = dateStr.split("-").map(Number);
     const [timeStr, gmt] = hourStr.split("-");
