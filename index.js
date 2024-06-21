@@ -1,202 +1,301 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const url = `https://servicodados.ibge.gov.br/`;
+    const ul = document.createElement("ul");
+    ul.className = "container"
+    const main = document.querySelector("main");
+    const buttonsArea = document.createElement("ul");
+    const filtro = document.querySelector("svg");
+    buttonsArea.className = "buttonsArea";
 
-  function init() {
-    getNews();
-    reBuildPagination();
-    setSearchFunction();
-    setFilterFunction();
-  }
+    const urlSearchParams = new URLSearchParams(location.search);
 
-  async function getNews() {
-    buildDefaultFilters();
-    setFilter({
-      key: "page",
-      value: new URLSearchParams(window.location.search).get("page") || 1,
-    });
-    const filters = buildUrlFilters();
-    let apiURL = `${url}api/v3/noticias?${filters}`;
-    const news = await (await fetch(apiURL)).json();
-    const newsList = document.getElementById("news-list");
-    newsList.innerHTML = "";
-    news.items.forEach((item) => {
-      const imgUrl = JSON.parse(item.imagens).image_intro;
-      const li = document.createElement("li");
-      li.classList.add("news-item");
-      li.innerHTML = `
-            <div class="img-news-area" style="background-image: url(https://agenciadenoticias.ibge.gov.br/${imgUrl});">
-               
-            </div>
-            <div>
-                <h2>${item.titulo}</h2>
-                <p>${item.introducao}</p>
-                <div class="d-flex justify-content-between">
-                <div>#${item.editorias}</div>    
-                <div>${calculateDaysAgo(item.data_publicacao)}</div>
-                </div>
-                <button class="see-more-btn">
-                    <a href="${item.link}" target="_blank">Leia mais</a>
-                </button>
-            </div>
-        `;
-      newsList.appendChild(li);
-    });
-  }
+    let parans = urlSearchParams.toString();
+    let position = parans.indexOf("?");
+    let result = parans.substring(position);
 
-  function buildDefaultFilters() {
-    if (getFilters().length > 0) return;
-    setFilter({ key: "qtd", value: 10 });
-    setFilter({ key: "page", value: 1 });
-  }
+    let page = !isNaN(urlSearchParams.get("page"))
+    ? parseInt(urlSearchParams.get("page"))
+    : 1
 
-  function calculateDaysAgo(date) {
-    if (!date) return "Data não disponível";
-    const [dateStr, hourStr] = date.split("T");
-    const [year, month, day] = dateStr.split("-").map(Number);
-    const [timeStr, gmt] = hourStr.split("-");
-    const [hour, minute, second] = timeStr.split(":").map(Number);
-    const publishDate = new Date(year, month - 1, day, hour, minute, second);
-    const now = new Date();
-    const diffMillis = now - publishDate;
-    const diffDays = Math.floor(diffMillis / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) {
-      return "Publicado hoje";
-    } else if (diffDays === 1) {
-      return "Publicado ontem";
-    } else {
-      return `Publicado há ${diffDays} dias`;
+
+    console.log(page);
+
+
+    let itemsPerPage = 10;//(parseInt(urlSearchParams.get("qtd")) !== null) ? (parseInt(urlSearchParams.get("qtd"))) : 10
+    let currentPage = !isNaN(urlSearchParams.get("page"))
+    ? parseInt(urlSearchParams.get("page"))
+    : 1
+     let totalPages = 1;
+    let noticias = [];
+    let jsonData;
+
+    filtro.setAttribute("onclick", 'openModal()');
+
+
+//     function getFilter(){
+//           // URLSearchParams é uma classe que facilita a manipulação de query strings
+//   const urlSearchParams = new URLSearchParams(location.search)
+
+//   // Pegando o valor do parâmetro name
+//   const pokemonName = urlSearchParams.get('name')
+
+
+
+//     }
+
+    //=====FUNCÃO QUE ABRE O MODAL E ADICIONA OS ANTIGOS VALORES DOS FILTROS
+    function openModal(){
+        const urlSearchParams = new URLSearchParams(location.search);
+
+        const modal = document.querySelector('main #modal');
+
+        const type       = document.querySelector("#type");
+        const quantidade = document.querySelector("#quantidade");
+        const de         = document.querySelector("#de");
+        const ate        = document.querySelector("#ate");
+
+
+        type.value       = urlSearchParams.get('tipo');
+        quantidade.value = urlSearchParams.get('qtd');
+        de.value         = urlSearchParams.get('de');
+        ate.value        = urlSearchParams.get('ate');
+
+        
+        modal.showModal();
+       
     }
-  }
 
-  function reBuildPagination(){
-    const paginator = document.getElementById("paginator");
-    paginator.innerHTML = "";
-    buildPagination();
-  }
+    //=======ADICIONANDO FUNÇÃO DE FECHAR MODAL AO BOTAO X
+    const close_modal = document.querySelector("#close_modal");
+    close_modal.addEventListener('click', () =>{
+        const modal = document.querySelector("main #modal");
+        modal.close();
+    })
 
-  function buildPagination() {
-    const paginator = document.getElementById("paginator");
-    const currentPage =
-      new URLSearchParams(window.location.search).get("page") || 1;
-    const urlParams = new URLSearchParams(window.location.search);
-    let existingParams = Array.from(urlParams.entries());
-    existingParams = existingParams.filter(([key, value]) => key !== "page");
-    if (currentPage < 5) {
-      for (let i = 1; i <= 10; i++) {
-        const li = document.createElement("li");
-        if (i == currentPage) li.classList.add("active");
-        li.classList.add("page-item");
-        const queryParams = existingParams.map(([key, value]) => `${key}=${value}`).join("&");
-        li.innerHTML = `<button><a href="?${queryParams}&page=${i}">${i}</a></button>`;
-        paginator.appendChild(li);
-      }
-    } else {
-      for (let i = Number(currentPage) - 4; i <= Number(currentPage) + 5; i++) {
-        const li = document.createElement("li");
-        if (i == currentPage) li.classList.add("active");
-        li.classList.add("page-item");
-        const queryParams = existingParams.map(([key, value]) => `${key}=${value}`).join("&");
-        li.innerHTML = `<button><a href="?${queryParams}&page=${i}">${i}</a></button>`;
-        paginator.appendChild(li);
-      }
+    
+
+async function API(query){
+
+    try {
+       const data = await fetch(`https://servicodados.ibge.gov.br/api/v3/noticias/?${query}`);
+
+       jsonData = await data.json();
+        
+       
+       noticias = await jsonData.items;
+
+        totalPages = jsonData.totalPages ;
+    
+        await displayItems(currentPage);
+        console.log("fez")
+       
+    } catch (error) {
+        console.error(error)
+        console.log("Algo de errado")
     }
-  }
-
-  function getFilters() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const filters = [];
-    for (const [key, value] of urlParams.entries()) {
-      filters.push({ key, value });
-    }
-    return filters;
-  }
-
-  function buildUrlFilters() {
-    const filters = getFilters();
-    const urlText = filters
-      .map((filter) => `${filter.key}=${filter.value}`)
-      .join("&");
-    return urlText;
-  }
-
-  function unsetFilter(key) {
-    const urlParams = new URLSearchParams(window.location.search);
-    urlParams.delete(key);
-    window.history.replaceState(null, null, `?${urlParams.toString()}`);
-    getNews();
-  }
-
-  function setFilter(newFilter) {
-    const currentFilters = getFilters();
-    const filterExist = currentFilters
-      .map((filter) => filter.key)
-      .includes(newFilter.key);
-    if (filterExist) {
-      currentFilters.splice(
-        currentFilters.findIndex((filter) => filter.key === newFilter.key),
-        1
-      );
-    }
-    currentFilters.push(newFilter);
-    const urlParams = new URLSearchParams(window.location.search);
-    urlParams.set(newFilter.key, newFilter.value);
-    window.history.replaceState(null, null, `?${urlParams.toString()}`);
-    reBuildPagination();
-  }
-
-  function setSearchFunction() {
-    const searchButton = document.getElementById("search-button");
-    searchButton.addEventListener("click", search);
-  }
-
-  function search() {
-    unsetFilter("busca");
-    const searchInput = document.getElementById("search");
-    setFilter({ key: "busca", value: searchInput.value });
-    getNews();
-  }
-
-  function setFilterFunction() {
-    const filterButton = document.getElementById("filter-button");
-    filterButton.addEventListener("click", filter);
-  }
-
-  function filter() {
-    const filterType = document.getElementById("filter-type").value;
-    const filterQtd = document.getElementById("qtd-filter").value;
-    const filterStart = document.getElementById("filter-start").value;
-    const filterEnd = document.getElementById("filter-end").value;
-
-    if (filterType) setFilter({ key: "tipo", value: filterType });
-    else unsetFilter("tipo");
-    if (filterQtd) setFilter({ key: "qtd", value: filterQtd });
-    else unsetFilter("qtd");
-    if (filterStart) setFilter({ key: "de", value: toFilterDate(filterStart) });
-    else unsetFilter("de");
-    if (filterEnd) setFilter({ key: "ate", value: toFilterDate(filterEnd) });
-    else unsetFilter("ate");
-
-    toggleFilter();
-    getNews();
-  }
-
-  function toFilterDate(date) {
-    console.log(date);
-    const [year, month, day] = date.split("-");
-    const formattedDate = `${month}-${day}-${year}`;
-    return formattedDate;
-  }
-
-  init();
-});
-
-function toggleFilter() {
-  const overlay = document.getElementById("overlay");
-  overlay.style.display = overlay.style.display === "block" ? "none" : "block";
-  const dialog = document.getElementById("filter-dialog");
-  if (dialog.getAttribute("open")) {
-    dialog.removeAttribute("open");
-  } else {
-    dialog.setAttribute("open", true);
-  }
 }
+
+ // Função para exibir os itens de uma página específica
+function displayItems(page) {
+
+    ul.innerHTML = ''; // Limpar os itens existentes
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const items = noticias.slice(startIndex, endIndex);
+
+ 
+   
+
+    items.forEach(element => {
+
+        const li               = document.createElement("li");
+        li.className           = "newsitem";
+
+        const div              = document.createElement("div");
+
+        const titulo           = document.createElement("h2");
+        titulo.textContent     = element.titulo;
+        const introducao       = document.createElement("p");
+        introducao.textContent = element.introducao
+        const editora          = document.createElement("p");
+        editora.textContent    = `#${element.editorias}`;
+
+
+        let urlBase            = "https://agenciadenoticias.ibge.gov.br/"
+        const image            = JSON.parse(element.imagens);
+    
+        const urlImage         = urlBase + image.image_intro
+        const foto             = document.createElement("img");
+        foto.setAttribute("src", urlImage);
+
+
+
+        const leiaMais         = document.createElement("a");
+        leiaMais.textContent   = "Leia mais";
+        leiaMais.setAttribute("href", `${element.link}`);
+
+
+
+
+       li.appendChild(foto);
+       div.appendChild(titulo);
+       div.appendChild(introducao);
+       div.appendChild(editora);
+       div.appendChild(leiaMais);
+        li.appendChild(div);
+
+
+        ul.appendChild(li);
+
+    
+       });
+
+       main.appendChild(ul);
+       updateQueryString(currentPage);
+       createPaginationButtons();
+
+   
+}
+
+// function createButton(){
+
+    
+//     for(i = 1; i<= 10; i++){
+
+//         button = document.createElement("button");
+//         button.textContent = i; 
+//         li = document.createElement("li");
+//         li.appendChild(button);
+
+//         buttonsArea.appendChild(li);
+//         main.appendChild(buttonsArea);
+//     }
+// }
+
+
+ // Função para criar os botões de paginação
+ function createPaginationButtons() {
+    buttonsArea.innerHTML = ''; // Limpar os botões existentes
+
+    // console.log("entrou na função")
+     let page = 11;
+
+     
+
+
+    const urlSeachParam = new URLSearchParams(location.search);
+    const atualPage = parseInt(urlSeachParam.get("page"));
+
+    if(atualPage > 6){
+    
+
+        page += atualPage - 6;
+    }
+
+
+     
+     for (let i = page - 10; i < page; i++) {
+        
+
+        const li = document.createElement('li');
+        const button = document.createElement('button');
+        button.className = "pageButton"
+        button.textContent = i;
+        button.addEventListener('click', () => {
+            currentPage = i;
+
+            updateQueryString(currentPage);
+            // urlSeachParam.set("page", i)
+            
+            location.reload();
+            API(urlSeachParam.toString().substring(position));
+            
+        });
+
+        if(i === atualPage){
+            button.className = "activeButton"
+        }
+
+        li.appendChild(button);
+        buttonsArea.appendChild(li);
+    }
+
+
+
+    // const divButtonScroll = document.createElement("div");
+    // divButtonScroll.className = "divButtonScroll";
+    // divButtonScroll.appendChild(buttonsArea);
+    main.appendChild(buttonsArea);
+}
+
+
+
+
+
+
+        // Função para atualizar a query string da URL
+        function updateQueryString(page) {
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.set('page', page);
+            window.history.pushState({}, '', newUrl);
+        }
+
+        // Verificar a query string ao carregar a página
+        function checkQueryString() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const page = parseInt(urlParams.get('page')) || 1;
+
+            displayItems(page);
+        }
+
+        // Chamar a função para buscar os itens quando a página carregar
+        checkQueryString();
+
+
+        function filterNews(event){
+            event.preventDefault();
+
+            const form = document.querySelector("#form_modal");
+
+            let formData = new FormData(form);
+           
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.set('tipo',formData.get("type"));
+            newUrl.searchParams.set('qtd', formData.get("quantidade"));
+            newUrl.searchParams.set('de', formData.get("de"));
+            newUrl.searchParams.set('ate', formData.get("ate"));
+            window.history.pushState({}, '', newUrl);
+
+            itemsPerPage = formData.get("qtd");
+
+            
+
+            displayItems(currentPage);
+            
+        }
+
+
+       function SearchNews(event){
+            event.preventDefault();
+
+
+        
+
+            const form = document.querySelector("#main_form");
+
+            let formData = new FormData(form);
+            const newUrl = new URL(window.location.href);
+
+
+            if(formData.get("main_input")){
+
+                newUrl.searchParams.set('busca', formData.get("main_input"));
+                window.history.pushState({}, '', newUrl);
+    
+                 document.querySelector("#main_input").value = '';
+
+
+            }
+
+        }
+
+
+API(result);
